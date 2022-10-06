@@ -3,33 +3,30 @@ package com.example.tipapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.FloatRange
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tipapp.ui.components.MainTextFiled
 import com.example.tipapp.ui.theme.TipAppTheme
+import com.example.tipapp.ui.util.calculateTipAmount
+import com.example.tipapp.ui.util.calculateTipForEachPerson
 import com.example.tipapp.ui.widgets.RoundIconButton
 
 class MainActivity : ComponentActivity() {
@@ -48,9 +45,7 @@ class MainActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    TopHeader()
 
-                    Spacer(modifier = Modifier.height(12.dp))
 
                     MainContent()
 
@@ -117,15 +112,24 @@ fun BillForm(
     modifier : Modifier = Modifier,
     onValChange : (String) -> Unit = {}
 ){
-    val totalBillState = remember { mutableStateOf("") }
+    val totalBill = remember { mutableStateOf("") }
 
-    var split by remember { mutableStateOf(1) }
+    var splitAmount by remember { mutableStateOf(1) }
 
-    val splitPercentage by remember { mutableStateOf(0.0)}
+    var tipPercentage by remember { mutableStateOf(0f)}
 
-    var sliderPositionState by remember { mutableStateOf(0f)}
+
+    val tipPercentageInInt = (tipPercentage * 100).toInt()
+
+    var tipAmount by remember { mutableStateOf(0.0)}
+
+    var totalPerPerson by remember { mutableStateOf(0.0)}
 
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    TopHeader(totalPerPerson = totalPerPerson)
+
+    Spacer(modifier = Modifier.height(12.dp))
 
     Surface(
         modifier = Modifier
@@ -141,19 +145,19 @@ fun BillForm(
 
             MainTextFiled(
                 modifier = Modifier.padding(12.dp),
-                valueState = totalBillState,
+                valueState = totalBill,
                 label = "Enter Bill",
                 isEnabled = true,
                 isSingleLine = true ,
                 keyboardType = KeyboardType.Number ,
                 onAction = KeyboardActions {
-                    if (totalBillState.value.trim().isEmpty()) return@KeyboardActions
+                    if (totalBill.value.trim().isEmpty()) return@KeyboardActions
                     keyboardController?.hide()
-                    onValChange(totalBillState.value.trim())
+                    onValChange(totalBill.value.trim())
                 }
             )
 
-     //       if (totalBillState.value.isNotEmpty()){ // show this part only if value in entered
+            if (totalBill.value.isNotEmpty()){ // show this part only if value in entered
                 Row(
                     modifier = Modifier.padding(12.dp),
                     horizontalArrangement = Arrangement.Start ,
@@ -171,25 +175,29 @@ fun BillForm(
                     RoundIconButton(
                         imageVector = Icons.Rounded.Remove ,
                         onClick = {
-                            if (split > 1 ){
-                                split -= 1
-                            }
+                            if (splitAmount > 1 ) splitAmount -= 1
+
+                            totalPerPerson = calculateTipForEachPerson(totalBill.value.toDouble() , tipPercentageInInt , splitAmount)
                         }
                     )
                     
                     Text(
                         modifier = Modifier
                             .padding(horizontal = 10.dp),
-                        text = split.toString() ,
+                        text = splitAmount.toString() ,
                         style = TextStyle(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
 
-                    RoundIconButton(){
-                        split += 1
-                    }
+                    RoundIconButton(
+                        onClick = {
+                            splitAmount += 1
+
+                            totalPerPerson = calculateTipForEachPerson(totalBill.value.toDouble() , tipPercentageInInt , splitAmount)
+                        }
+                    )
 
                 }
 
@@ -208,7 +216,7 @@ fun BillForm(
                 Spacer(modifier = Modifier.width(190.dp))
 
                 Text(
-                    text = "$ $splitPercentage" ,
+                    text = "$ $tipAmount" ,
                     style = TextStyle(
                         fontSize = 18.sp
                     )
@@ -225,7 +233,7 @@ fun BillForm(
 
             ) {
                 Text(
-                    text = "$sliderPositionState %" ,
+                    text = "$tipPercentageInInt %" ,
                     style = TextStyle(
                         fontSize = 18.sp
                     )
@@ -233,10 +241,15 @@ fun BillForm(
                 
                 Slider(
                     modifier = Modifier.padding(12.dp),
-                    value = sliderPositionState,
+                    value = tipPercentage,
                     onValueChange = {
-                        sliderPositionState = it
-                    }
+                        tipPercentage = it
+                        tipAmount = calculateTipAmount(totalBill.value.toDouble() , tipPercentageInInt )
+                        totalPerPerson = calculateTipForEachPerson(totalBill.value.toDouble() , tipPercentageInInt , splitAmount)
+
+
+                    } ,
+                    steps = 5
                 )
 
                 
@@ -244,16 +257,20 @@ fun BillForm(
             }
 
                 
-//                }else{
-//                    Box() {
-//
-//                    }
-//                }
+                }else{
+                    Box() {
+
+                    }
+                }
+
+
 
 
         }
     }
 }
+
+
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -268,6 +285,8 @@ fun MainContent() {
 
 
 }
+
+
 
 
 
@@ -302,9 +321,6 @@ fun DefaultPreview() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            TopHeader()
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             MainContent()
 
